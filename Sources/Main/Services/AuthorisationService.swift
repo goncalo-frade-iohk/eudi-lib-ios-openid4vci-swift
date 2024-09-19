@@ -50,8 +50,9 @@ public actor AuthorisationService: AuthorisationServiceType {
     url: URL,
     request: T
   ) async throws -> U {
+      let hackUrl = URL(string: url.absoluteString.replacingOccurrences(of: "host.docker.internal", with: "localhost"))!
     let post = try FormPost(
-      url: url,
+      url: hackUrl,
       contentType: .form,
       formData: try request.toDictionary()
     )
@@ -66,8 +67,9 @@ public actor AuthorisationService: AuthorisationServiceType {
     headers: [String: String] = [:],
     parameters: [String: String]
   ) async throws -> U {
+      let hackUrl = URL(string: url.absoluteString.replacingOccurrences(of: "host.docker.internal", with: "localhost"))!
     let post = try FormPost(
-      url: url,
+      url: hackUrl,
       contentType: .form,
       additionalHeaders: headers,
       formData: parameters
@@ -83,8 +85,9 @@ public actor AuthorisationService: AuthorisationServiceType {
     headers: [String: String],
     body: [String: Any]
   ) async throws -> U {
+      let hackUrl = URL(string: url.absoluteString.replacingOccurrences(of: "host.docker.internal", with: "localhost"))!
     let post = try FormPost(
-      url: url,
+      url: hackUrl,
       contentType: .json,
       additionalHeaders: headers,
       formData: body

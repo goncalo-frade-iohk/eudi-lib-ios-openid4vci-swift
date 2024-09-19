@@ -150,7 +150,7 @@ public actor AuthorizationServerClient: AuthorizationServerClientType {
     let authzRequest = AuthorizationRequest(
       responseType: Self.responseType,
       clientId: config.clientId,
-      redirectUri: config.authFlowRedirectionURI.absoluteString,
+      redirectUri: config.authFlowRedirectionURI.absoluteString.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
       scope: scopes.map { $0.value }.joined(separator: " ").appending(" ").appending(Constants.OPENID_SCOPE),
       credentialConfigurationIds: toAuthorizationDetail(credentialConfigurationIds: credentialConfigurationIdentifiers),
       state: state,
