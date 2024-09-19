@@ -395,3 +395,11 @@ private extension AuthorizationServerClient {
     }
   }
 }
+
+private extension CharacterSet {
+    static let urlQueryValueAllowed: CharacterSet = {
+        var characterSet = CharacterSet.urlQueryAllowed
+        characterSet.remove(charactersIn: "&=+/?:")
+        return characterSet
+    }()
+}

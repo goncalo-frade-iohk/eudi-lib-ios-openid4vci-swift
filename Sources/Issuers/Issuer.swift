@@ -739,7 +739,7 @@ public extension Issuer {
   static func createResponseEncryptionSpec(_ issuerResponseEncryptionMetadata: CredentialResponseEncryption) -> IssuanceResponseEncryptionSpec? {
     switch issuerResponseEncryptionMetadata {
     case .notRequired:
-      return Self.createResponseEncryptionSpecFrom(algorithmsSupported: [.init(.RSA_OAEP_256)], encryptionMethodsSupported: [.init(.A128CBC_HS256)])
+        return Self.createResponseEncryptionSpecFrom(algorithmsSupported: [.init(.ECDH_ES)], encryptionMethodsSupported: [.init(.A128CBC_HS256)])
     case let .required(algorithmsSupported, encryptionMethodsSupported):
       return Self.createResponseEncryptionSpecFrom(algorithmsSupported: algorithmsSupported, encryptionMethodsSupported: encryptionMethodsSupported)
     }
@@ -764,11 +764,10 @@ public extension Issuer {
     if JWEAlgorithm.Family.parse(.RSA).contains(algorithm) {
       privateKey = try? KeyController.generateRSAPrivateKey()
       if let privateKey,
-         let publicKey = try? KeyController.generateRSAPublicKey(from: privateKey) {
-          var publicKeyJWK = try? publicKey.jwk
-          publicKeyJWK?.publicKeyUse = .encryption
-          publicKeyJWK?.keyID = UUID().uuidString
-          publicKeyJWK?.algorithm = algorithm.name
+         var publicKeyJWK = try? privateKey.jwk.publicKey {
+          publicKeyJWK.publicKeyUse = .encryption
+          publicKeyJWK.keyID = UUID().uuidString
+          publicKeyJWK.algorithm = algorithm.name
           jwk = publicKeyJWK
       }
     } else if JWEAlgorithm.Family.parse(.ECDH_ES).contains(algorithm) {

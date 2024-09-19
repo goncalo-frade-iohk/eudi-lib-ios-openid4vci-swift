@@ -119,6 +119,47 @@ public extension BindingKey {
         )
 
         return .jwt(jwt.jwtString)
+      case .w3CSignedJwt(let spec):
+          let suites = spec.proofTypesSupported?["jwt"]?.algorithms.contains { $0 == algorithm.name } ??  true
+          guard suites else {
+            throw CredentialIssuanceError.cryptographicSuiteNotSupported(algorithm.name)
+          }
+
+          let proofs = spec.proofTypesSupported?.keys.contains { $0 == "jwt" } ?? true
+          guard proofs else {
+            throw CredentialIssuanceError.proofTypeNotSupported
+          }
+
+          let alg = try algorithm.parseToJoseLibrary()
+
+          if alg == .ES256K {
+              ES256KSigner.invertedBytesR_S = true
+          }
+
+          let aud = issuanceRequester.issuerMetadata.credentialIssuerIdentifier.url.absoluteString
+          let header = DefaultJWSHeaderImpl(
+              algorithm: alg,
+              keyID: jwk.keyID,
+              jwk: jwk,
+              type: "openid4vci-proof+jwt"
+          )
+
+          let jwt = try JWT.signed(
+            claims: {
+              IssuedAtClaim(value: Date())
+              AudienceClaim(value: aud)
+              StringClaim(key: "nonce", value: cNonce ?? "")
+              IssuerClaim(value: issuer ?? "")
+            },
+            protectedHeader: header,
+            key: privateKey
+          )
+
+          if alg == .ES256K {
+              ES256KSigner.invertedBytesR_S = false
+          }
+
+          return .jwt(jwt.jwtString)
       default: break
       }
       break

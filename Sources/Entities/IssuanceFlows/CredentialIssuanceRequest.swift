@@ -71,6 +71,7 @@ public struct DeferredCredentialRequest: Codable {
 public enum SingleCredential {
   case msoMdoc(MsoMdocFormat.MsoMdocSingleCredential)
   case sdJwtVc(SdJwtVcFormat.SdJwtVcSingleCredential)
+  case w3CSignedJwt(W3CSignedJwtFormat.W3CSignedJWTVcSingleCredential)
 }
 
 public extension SingleCredential {
@@ -128,6 +129,65 @@ public extension SingleCredential {
           return JSON(dictionary.filter { $0.value != nil })
         }
       }
+    case .w3CSignedJwt(let credential):
+        switch credential.requestedCredentialResponseEncryption {
+        case .notRequested:
+          if let identifier = credential.credentialIdentifier {
+            let dictionary = [
+              "format": W3CSignedJwtFormat.FORMAT,
+              "proof": credential.proof != nil ? (try? credential.proof.toDictionary()) : nil,
+              "credential_definition": [
+                "type": credential.credentialDefinition.type,
+                "credential_subject": credential.credentialDefinition.credentialSubject ?? [:]
+              ]
+            ] as [String : Any?]
+            return JSON(dictionary.filter { $0.value != nil })
+
+          } else {
+            let dictionary = [
+              "format": W3CSignedJwtFormat.FORMAT,
+              "proof": credential.proof != nil ? (try? credential.proof.toDictionary()) : nil,
+              "credential_definition": [
+                "type": credential.credentialDefinition.type,
+                "credential_subject": credential.credentialDefinition.credentialSubject ?? [:]
+              ]
+            ] as [String : Any?]
+            let json = JSON(dictionary.filter { $0.value != nil })
+            return json
+          }
+        case .requested(
+          let encryptionJwk,
+          _,
+          let responseEncryptionAlg,
+          let responseEncryptionMethod
+        ):
+          if let identifier = credential.credentialIdentifier {
+            let dictionary = [
+              "format": W3CSignedJwtFormat.FORMAT,
+              "proof": credential.proof != nil ? (try? credential.proof.toDictionary()) : nil,
+              "credential_subject": credential.credentialDefinition.credentialSubject,
+              "credential_response_encryption": [
+                "jwk": try encryptionJwk.toDictionary(),
+                "alg": responseEncryptionAlg.name,
+                "enc": responseEncryptionMethod.name
+              ]
+            ] as [String : Any?]
+            return JSON(dictionary.filter { $0.value != nil })
+
+          } else {
+            let dictionary = [
+              "format": W3CSignedJwtFormat.FORMAT,
+              "proof": credential.proof != nil ? (try? credential.proof.toDictionary()) : nil,
+              "credential_response_encryption": [
+                "jwk": try encryptionJwk.toDictionary(),
+                "alg": responseEncryptionAlg.name,
+                "enc": responseEncryptionMethod.name
+              ],
+              "credential_subject": credential.credentialDefinition.credentialSubject
+            ] as [String : Any?]
+            return JSON(dictionary.filter { $0.value != nil })
+          }
+        }
     case .sdJwtVc(let credential):
       switch credential.requestedCredentialResponseEncryption {
       case .notRequested:

@@ -104,6 +104,38 @@ public extension CredentialSupported {
         claimSet: claimSet,
         proof: proof
       )
+    case .w3CSignedJwt(let credentialConfiguration):
+        let issuerEncryption = requester.issuerMetadata.credentialResponseEncryption
+        let responseEncryptionSpec = responseEncryptionSpecProvider(issuerEncryption)
+
+        if let responseEncryptionSpec {
+          switch issuerEncryption {
+          case .notRequired: break
+          case .required(
+            let algorithmsSupported,
+            let encryptionMethodsSupported
+          ):
+            if !algorithmsSupported.contains(responseEncryptionSpec.algorithm) {
+              throw CredentialIssuanceError.responseEncryptionAlgorithmNotSupportedByIssuer
+            }
+
+            if !encryptionMethodsSupported.contains(responseEncryptionSpec.encryptionMethod) {
+              throw CredentialIssuanceError.responseEncryptionMethodNotSupportedByIssuer
+            }
+          }
+        }
+        let claims: [ClaimName: Claim?]?
+        switch claimSet {
+        case .w3CSignedJwt(let w3CSignedJwtClaimSet):
+            claims = w3CSignedJwtClaimSet.claims
+        default:
+            claims = nil
+        }
+        return try credentialConfiguration.toIssuanceRequest(
+            responseEncryptionSpec: issuerEncryption.notRequired ? nil : responseEncryptionSpec,
+            claimSet: claims, 
+            proof: proof
+        )
     default:
       throw ValidationError.error(reason: "Unsupported profile for issuance request")
     }
