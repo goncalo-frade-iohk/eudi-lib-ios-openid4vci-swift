@@ -175,6 +175,45 @@ public actor IssuanceRequester: IssuanceRequesterType {
             return .success(try response.toDomain())
           }
         }
+      case .w3CSignedJwt(let credential):
+        switch issuerMetadata.credentialResponseEncryption {
+        case .notRequired:
+          guard let response = SingleIssuanceSuccessResponse.fromJSONString(string) else {
+            return .failure(ValidationError.todo(reason: "Cannot decode .notRequired response"))
+          }
+          return .success(try response.toDomain())
+        case .required:
+          guard let key = credential.credentialEncryptionKey else {
+            return .failure(ValidationError.error(reason: "Invalid private key"))
+          }
+
+          switch credential.requestedCredentialResponseEncryption {
+          case .notRequested:
+            throw ValidationError.error(reason: "Issuer expects response encryption")
+          case .requested(
+            _,
+            _,
+            let responseEncryptionAlg,
+            let responseEncryptionMethod
+          ):
+
+            guard
+              let keyManagementAlgorithm = KeyManagementAlgorithm(algorithm: responseEncryptionAlg),
+              let contentEncryptionAlgorithm = ContentEncryptionAlgorithm(encryptionMethod: responseEncryptionMethod)
+            else {
+              return .failure(ValidationError.error(reason: "Unsupported encryption algorithms"))
+            }
+
+            let payload = try decrypt(
+              jwtString: string,
+              keyManagementAlgorithm: keyManagementAlgorithm,
+              contentEncryptionAlgorithm: contentEncryptionAlgorithm,
+              privateKey: key
+            )
+            let response = try JSONDecoder().decode(SingleIssuanceSuccessResponse.self, from: payload)
+            return .success(try response.toDomain())
+          }
+        }
       }
       
     } catch {

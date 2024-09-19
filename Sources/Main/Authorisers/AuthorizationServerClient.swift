@@ -150,7 +150,7 @@ public actor AuthorizationServerClient: AuthorizationServerClientType {
     let authzRequest = AuthorizationRequest(
       responseType: Self.responseType,
       clientId: config.clientId,
-      redirectUri: config.authFlowRedirectionURI.absoluteString.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+      redirectUri: config.authFlowRedirectionURI.absoluteString,
       scope: scopes.map { $0.value }.joined(separator: " ").appending(" ").appending(Constants.OPENID_SCOPE),
       credentialConfigurationIds: toAuthorizationDetail(credentialConfigurationIds: credentialConfigurationIdentifiers),
       state: state,
@@ -394,4 +394,12 @@ private extension AuthorizationServerClient {
       ]
     }
   }
+}
+
+private extension CharacterSet {
+    static let urlQueryValueAllowed: CharacterSet = {
+        var characterSet = CharacterSet.urlQueryAllowed
+        characterSet.remove(charactersIn: "&=+/?:")
+        return characterSet
+    }()
 }

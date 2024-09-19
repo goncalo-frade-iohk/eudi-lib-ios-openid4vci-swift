@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 import Foundation
+import JSONWebKey
 import SwiftyJSON
 
 public struct W3CSignedJwtFormat: FormatProfile {
@@ -35,7 +36,62 @@ public struct W3CSignedJwtFormat: FormatProfile {
 }
 
 public extension W3CSignedJwtFormat {
-  
+
+    struct W3CSignedJWTVcSingleCredential: Codable {
+        public let proof: Proof?
+        public let format: String = W3CSignedJwtFormat.FORMAT
+        public let credentialEncryptionJwk: JWK?
+        public let credentialEncryptionKey: SecKey?
+        public let credentialResponseEncryptionAlg: JWEAlgorithm?
+        public let credentialResponseEncryptionMethod: JOSEEncryptionMethod?
+        public let credentialDefinition: CredentialDefinition
+        public let requestedCredentialResponseEncryption: RequestedCredentialResponseEncryption
+        public let credentialIdentifier: CredentialIdentifier?
+
+        enum CodingKeys: String, CodingKey {
+            case proof
+            case credentialDefinition
+        }
+
+        public init(
+            proof: Proof?,
+            credentialEncryptionJwk: JWK? = nil,
+            credentialEncryptionKey: SecKey? = nil,
+            credentialResponseEncryptionAlg: JWEAlgorithm? = nil,
+            credentialResponseEncryptionMethod: JOSEEncryptionMethod? = nil,
+            credentialDefinition: CredentialDefinition,
+            credentialIdentifier: CredentialIdentifier?
+        ) throws {
+            self.proof = proof
+            self.credentialEncryptionJwk = credentialEncryptionJwk
+            self.credentialEncryptionKey = credentialEncryptionKey
+            self.credentialResponseEncryptionAlg = credentialResponseEncryptionAlg
+            self.credentialResponseEncryptionMethod = credentialResponseEncryptionMethod
+            self.credentialDefinition = .init(
+                type: credentialDefinition.type,
+                credentialSubject: credentialDefinition.credentialSubject
+            )
+            self.credentialIdentifier = credentialIdentifier
+
+            self.requestedCredentialResponseEncryption = try .init(
+                encryptionJwk: credentialEncryptionJwk,
+                encryptionKey: credentialEncryptionKey,
+                responseEncryptionAlg: credentialResponseEncryptionAlg,
+                responseEncryptionMethod: credentialResponseEncryptionMethod
+            )
+        }
+        public init(from decoder: Decoder) throws {
+            fatalError("No supported yet")
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(proof, forKey: .proof)
+
+            try container.encode(credentialDefinition, forKey: .credentialDefinition)
+        }
+    }
+
   struct W3CSignedJwtClaimSet: Codable {
     public let claims: [ClaimName: Claim]
     
@@ -141,100 +197,112 @@ public extension W3CSignedJwtFormat {
     }
   }
   
-  struct CredentialConfiguration: Codable {
-    public let scope: String?
-    public let cryptographicBindingMethodsSupported: [CryptographicBindingMethod]
-    public let credentialSigningAlgValuesSupported: [String]
-    public let proofTypesSupported: [String: ProofSigningAlgorithmsSupported]?
-    public let display: [Display]
-    public let credentialDefinition: CredentialDefinition
-    public let order: [ClaimName]
-    
-    enum CodingKeys: String, CodingKey {
-      case scope
-      case cryptographicBindingMethodsSupported = "cryptographic_binding_methods_supported"
-      case credentialSigningAlgValuesSupported = "credential_signing_alg_values_supported"
-      case proofTypesSupported = "proof_types_supported"
-      case display
-      case credentialDefinition = "credential_definition"
-      case order
-    }
-    
-    public init(
-      scope: String?,
-      cryptographicBindingMethodsSupported: [CryptographicBindingMethod],
-      credentialSigningAlgValuesSupported: [String],
-      proofTypesSupported: [String: ProofSigningAlgorithmsSupported]?,
-      display: [Display],
-      credentialDefinition: CredentialDefinition,
-      order: [ClaimName]
-    ) {
-      self.scope = scope
-      self.cryptographicBindingMethodsSupported = cryptographicBindingMethodsSupported
-      self.credentialSigningAlgValuesSupported = credentialSigningAlgValuesSupported
-      self.proofTypesSupported = proofTypesSupported
-      self.display = display
-      self.credentialDefinition = credentialDefinition
-      self.order = order
-    }
-    
-    public init(from decoder: Decoder) throws {
-      let container = try decoder.container(keyedBy: CodingKeys.self)
-      
-      scope = try container.decodeIfPresent(String.self, forKey: .scope)
-      cryptographicBindingMethodsSupported = try container.decode([CryptographicBindingMethod].self, forKey: .cryptographicBindingMethodsSupported)
-      credentialSigningAlgValuesSupported = try container.decode([String].self, forKey: .credentialSigningAlgValuesSupported)
-      proofTypesSupported = try? container.decode([String: ProofSigningAlgorithmsSupported].self, forKey: .proofTypesSupported)
-      display = try container.decode([Display].self, forKey: .display)
-      credentialDefinition = try container.decode(CredentialDefinition.self, forKey: .credentialDefinition)
-      order = try container.decode([ClaimName].self, forKey: .order)
-    }
-    
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.container(keyedBy: CodingKeys.self)
-      
-      try container.encode(scope, forKey: .scope)
-      try container.encode(cryptographicBindingMethodsSupported, forKey: .cryptographicBindingMethodsSupported)
-      try container.encode(credentialSigningAlgValuesSupported, forKey: .credentialSigningAlgValuesSupported)
-      try container.encode(proofTypesSupported, forKey: .proofTypesSupported)
-      try container.encode(display, forKey: .display)
-      try container.encode(credentialDefinition, forKey: .credentialDefinition)
-      try container.encode(order, forKey: .order)
-    }
-    
-    init(json: JSON) throws {
-      self.scope = json["scope"].string
-      self.cryptographicBindingMethodsSupported = try json["cryptographic_binding_methods_supported"].arrayValue.map {
-        try CryptographicBindingMethod(method: $0.stringValue)
-      }
-      self.credentialSigningAlgValuesSupported = json["credential_signing_alg_values_supported"].arrayValue.map {
-        $0.stringValue
-      }
-      self.proofTypesSupported = json["proof_types_supported"].dictionaryObject?.compactMapValues { values in
-        if let types = values as? [String: Any],
-           let algorithms = types["proof_signing_alg_values_supported"] as? [String] {
-          return ProofSigningAlgorithmsSupported(algorithms: algorithms)
+    struct CredentialConfiguration: Codable {
+        public let scope: String?
+        public let cryptographicBindingMethodsSupported: [CryptographicBindingMethod]
+        public let credentialSigningAlgValuesSupported: [String]
+        public let proofTypesSupported: [String: ProofSigningAlgorithmsSupported]?
+        public let display: [Display]
+        public let credentialDefinition: CredentialDefinition
+        public let order: [ClaimName]
+
+        enum CodingKeys: String, CodingKey {
+            case scope
+            case cryptographicBindingMethodsSupported = "cryptographic_binding_methods_supported"
+            case credentialSigningAlgValuesSupported = "credential_signing_alg_values_supported"
+            case proofTypesSupported = "proof_types_supported"
+            case display
+            case credentialDefinition = "credential_definition"
+            case order
         }
-        return nil
-      }
-      self.display = json["display"].arrayValue.map { json in
-        Display(json: json)
-      }
-      self.credentialDefinition = CredentialDefinition(json: json["credential_definition"])
-      self.order = json["order"].arrayValue.map {
-        ClaimName($0.stringValue)
-      }
+
+        public init(
+            scope: String?,
+            cryptographicBindingMethodsSupported: [CryptographicBindingMethod],
+            credentialSigningAlgValuesSupported: [String],
+            proofTypesSupported: [String: ProofSigningAlgorithmsSupported]?,
+            display: [Display],
+            credentialDefinition: CredentialDefinition,
+            order: [ClaimName]
+        ) {
+            self.scope = scope
+            self.cryptographicBindingMethodsSupported = cryptographicBindingMethodsSupported
+            self.credentialSigningAlgValuesSupported = credentialSigningAlgValuesSupported
+            self.proofTypesSupported = proofTypesSupported
+            self.display = display
+            self.credentialDefinition = credentialDefinition
+            self.order = order
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            scope = try container.decodeIfPresent(String.self, forKey: .scope)
+            cryptographicBindingMethodsSupported = try container.decode([CryptographicBindingMethod].self, forKey: .cryptographicBindingMethodsSupported)
+            credentialSigningAlgValuesSupported = try container.decode([String].self, forKey: .credentialSigningAlgValuesSupported)
+            proofTypesSupported = try? container.decode([String: ProofSigningAlgorithmsSupported].self, forKey: .proofTypesSupported)
+            display = try container.decode([Display].self, forKey: .display)
+            credentialDefinition = try container.decode(CredentialDefinition.self, forKey: .credentialDefinition)
+            order = try container.decode([ClaimName].self, forKey: .order)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(scope, forKey: .scope)
+            try container.encode(cryptographicBindingMethodsSupported, forKey: .cryptographicBindingMethodsSupported)
+            try container.encode(credentialSigningAlgValuesSupported, forKey: .credentialSigningAlgValuesSupported)
+            try container.encode(proofTypesSupported, forKey: .proofTypesSupported)
+            try container.encode(display, forKey: .display)
+            try container.encode(credentialDefinition, forKey: .credentialDefinition)
+            try container.encode(order, forKey: .order)
+        }
+
+        init(json: JSON) throws {
+            self.scope = json["scope"].string
+            self.cryptographicBindingMethodsSupported = try json["cryptographic_binding_methods_supported"].arrayValue.map {
+                try CryptographicBindingMethod(method: $0.stringValue)
+            }
+            self.credentialSigningAlgValuesSupported = json["credential_signing_alg_values_supported"].arrayValue.map {
+                $0.stringValue
+            }
+            self.proofTypesSupported = json["proof_types_supported"].dictionaryObject?.compactMapValues { values in
+                if let types = values as? [String: Any],
+                   let algorithms = types["proof_signing_alg_values_supported"] as? [String] {
+                    return ProofSigningAlgorithmsSupported(algorithms: algorithms)
+                }
+                return nil
+            }
+            self.display = json["display"].arrayValue.map { json in
+                Display(json: json)
+            }
+            self.credentialDefinition = CredentialDefinition(json: json["credential_definition"])
+            self.order = json["order"].arrayValue.map {
+                ClaimName($0.stringValue)
+            }
+        }
+
+        func toIssuanceRequest(
+            responseEncryptionSpec: IssuanceResponseEncryptionSpec?,
+            credentialIdentifier: CredentialIdentifier? = nil,
+            claimSet: [ClaimName: Claim?]?,
+            proof: Proof?
+        ) throws -> CredentialIssuanceRequest {
+            try .single(
+                .w3CSignedJwt(
+                    W3CSignedJWTVcSingleCredential(
+                        proof: proof,
+                        credentialDefinition: .init(
+                            type: credentialDefinition.type,
+                            credentialSubject: claimSet
+                        ), credentialIdentifier: nil
+                    )
+                ), responseEncryptionSpec
+            )
+        }
     }
-    
-    func toIssuanceRequest(
-      claimSet: ClaimSet?,
-      proof: Proof?
-    ) throws -> CredentialIssuanceRequest {
-      throw ValidationError.error(reason: "Not yet implemented")
-    }
-  }
-  
-  struct CredentialDefinition: Codable {
+
+struct CredentialDefinition: Codable {
     public let type: [String]
     public let credentialSubject: [ClaimName: Claim?]?
     
