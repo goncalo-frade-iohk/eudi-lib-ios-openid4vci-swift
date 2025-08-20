@@ -15,7 +15,7 @@ let package = Package(
   dependencies: [
     .package(url: "https://github.com/SwiftyJSON/SwiftyJSON.git", from: "5.0.1"),
     .package(url: "https://github.com/scinfu/SwiftSoup.git", from: "2.6.0"),
-    .package(url: "https://github.com/beatt83/jose-swift.git", .upToNextMajor(from: "3.3.1")),
+    .package(url: "https://github.com/beatt83/jose-swift.git", .upToNextMajor(from: "6.0.0")),
   ],
   targets: [
     .target(
